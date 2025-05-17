@@ -1,6 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
-import { useThree } from '@react-three/fiber';
-import * as THREE from 'three';
+import { useRef, useState, useEffect } from 'react';
 import { Html } from '@react-three/drei';
 
 interface TooltipData {
@@ -16,9 +14,7 @@ interface NetworkTooltipProps {
 }
 
 export function NetworkTooltip({ position, data, visible = true }: NetworkTooltipProps) {
-  const { camera } = useThree();
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const worldPos = new THREE.Vector3(...position);
 
   return (
     <Html

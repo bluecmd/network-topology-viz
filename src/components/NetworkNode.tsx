@@ -21,7 +21,7 @@ export const NetworkNode = forwardRef<NetworkNodeHandle, NetworkNodeProps>(({
   scale = 1 
 }, ref) => {
   const groupRef = useRef<THREE.Group>(null);
-  const { scene } = useGLTF('/vintage_terminal.glb');
+  const { scene } = useGLTF('vintage_terminal.glb');
   
   // Clone the scene to avoid sharing materials between instances
   const model = scene.clone(true);
@@ -73,4 +73,4 @@ export const NetworkNode = forwardRef<NetworkNodeHandle, NetworkNodeProps>(({
 });
 
 // Preload the model to avoid loading delays
-useGLTF.preload('/vintage_terminal.glb'); 
+useGLTF.preload('vintage_terminal.glb'); 
