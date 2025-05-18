@@ -491,7 +491,7 @@ export const NetworkTopology: React.FC<NetworkTopologyProps> = ({
           title: `Link ${hoveredLink.source} → ${hoveredLink.target}`,
           details: [
             'Status: Connected',
-            'Latency: 5ms',
+            'Latency: low',
             `Traffic: ${link?.trafficIntensity || 'unknown'}`
           ]
         }

@@ -232,7 +232,7 @@ export function useTooltipAutoMovement(
             title: `Node ${node.id}`,
             details: [
               'Status: Active',
-              'Uptime: 99.9%',
+              'Uptime: 99.99%',
               'Load: Normal'
             ]
           }
@@ -273,9 +273,8 @@ export function useTooltipAutoMovement(
               type: 'link',
               title: `Link ${link.source} → ${link.target}`,
               details: [
-                'Status: Connected',
-                'Latency: 5ms',
-                'Bandwidth: 1Gbps'
+                'Status: Online',
+                'Latency: low',
               ]
             }
           });
