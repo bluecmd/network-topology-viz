@@ -13,9 +13,16 @@ interface NetworkTooltipProps {
   data: TooltipData;
   visible?: boolean;
   targetPosition?: [number, number, number]; // Position to draw line to
+  isDarkMode?: boolean;
 }
 
-export function NetworkTooltip({ position, data, visible = true, targetPosition }: NetworkTooltipProps) {
+export function NetworkTooltip({ 
+  position, 
+  data, 
+  visible = true, 
+  targetPosition,
+  isDarkMode = true
+}: NetworkTooltipProps) {
   const tooltipRef = useRef<HTMLDivElement>(null);
 
   // Create line geometry if targetPosition is provided
@@ -37,8 +44,8 @@ export function NetworkTooltip({ position, data, visible = true, targetPosition 
         <primitive object={new THREE.Line(
           lineGeometry,
           new THREE.LineBasicMaterial({ 
-            color: '#ffffff', 
-            opacity: 0.4, 
+            color: isDarkMode ? '#ffffff' : '#000000', 
+            opacity: isDarkMode ? 0.4 : 0.5, 
             transparent: true,
             linewidth: 1
           })

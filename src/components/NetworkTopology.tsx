@@ -76,6 +76,7 @@ const NetworkLink: React.FC<{
   targetId: string;
   onHover: (sourceId: string, targetId: string | null) => void;
   isHighlighted?: boolean;
+  isDarkMode?: boolean;
 }> = ({
   start,
   end,
@@ -83,7 +84,8 @@ const NetworkLink: React.FC<{
   sourceId,
   targetId,
   onHover,
-  isHighlighted = false
+  isHighlighted = false,
+  isDarkMode = true
 }) => {
   // Calculate sphere radius from start point (assuming both points are on same sphere)
   const radius = start.length();
@@ -106,9 +108,9 @@ const NetworkLink: React.FC<{
       <primitive object={new THREE.Line(
         lineGeometry,
         new THREE.LineBasicMaterial({ 
-          color: '#ffffff', 
+          color: isDarkMode ? '#ffffff' : '#000000', 
           linewidth: 2, 
-          opacity: isHighlighted ? 0.8 : 0.3, 
+          opacity: isHighlighted ? 0.8 : isDarkMode ? 0.3 : 0.4, 
           transparent: true 
         })
       )} />
@@ -116,6 +118,7 @@ const NetworkLink: React.FC<{
         start={[start.x, start.y, start.z]}
         end={[end.x, end.y, end.z]}
         intensity={trafficIntensity}
+        isDarkMode={isDarkMode}
       />
     </group>
   );
@@ -169,6 +172,9 @@ export const NetworkTopology: React.FC = () => {
   const [autoTooltip, setAutoTooltip] = useState(true);
 
   const autoTooltipData = useTooltipAutoMovement(networkData.nodes, networkData.links);
+
+  const [isControlsPanelExpanded, setIsControlsPanelExpanded] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true);
 
   // Update node positions
   useEffect(() => {
@@ -286,56 +292,169 @@ export const NetworkTopology: React.FC = () => {
   const tooltipTarget = getTooltipTargetPosition();
 
   return (
-    <div style={{ width: '100%', height: '100vh', position: 'relative' }}>
+    <div style={{ 
+      width: '100%', 
+      height: '100vh', 
+      position: 'relative',
+      background: isDarkMode ? '#1a1a1a' : '#ffffff',
+      transition: 'background 0.3s ease'
+    }}>
       <div style={{
         position: 'absolute',
         top: 20,
         left: 20,
-        background: 'rgba(0,0,0,0.8)',
-        padding: 20,
+        background: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)',
         borderRadius: 8,
-        color: 'white',
+        color: isDarkMode ? 'white' : 'black',
         zIndex: 1000,
+        transition: 'all 0.3s ease',
+        width: isControlsPanelExpanded ? 'auto' : '48px',
+        height: isControlsPanelExpanded ? 'auto' : '48px',
+        overflow: 'hidden',
+        cursor: 'pointer',
+        boxShadow: isDarkMode 
+          ? '0 4px 12px rgba(0,0,0,0.3)' 
+          : '0 4px 12px rgba(0,0,0,0.1)',
       }}>
-        <h3 style={{ marginBottom: 10 }}>Network Controls</h3>
-        <div style={{ marginBottom: 15 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <input
-              type="checkbox"
-              checked={autoTooltip}
-              onChange={(e) => setAutoTooltip(e.target.checked)}
-            />
-            Auto-moving tooltip
-          </label>
+        <div 
+          style={{
+            padding: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            borderBottom: isControlsPanelExpanded 
+              ? isDarkMode 
+                ? '1px solid rgba(255,255,255,0.2)'
+                : '1px solid rgba(0,0,0,0.1)'
+              : 'none',
+          }}
+          onClick={() => setIsControlsPanelExpanded(!isControlsPanelExpanded)}
+        >
+          <svg 
+            width="24" 
+            height="24" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2"
+            style={{
+              transform: isControlsPanelExpanded ? 'rotate(180deg)' : 'none',
+              transition: 'transform 0.3s ease'
+            }}
+          >
+            <path d="M19 9l-7 7-7-7" />
+          </svg>
+          <span style={{ 
+            whiteSpace: 'nowrap',
+            opacity: isControlsPanelExpanded ? 1 : 0,
+            transition: 'opacity 0.3s ease'
+          }}>
+            Network Controls
+          </span>
         </div>
-        <h4 style={{ marginBottom: 8 }}>Traffic Intensity</h4>
-        {networkData.links.map((link) => (
-          <div key={`${link.source}-${link.target}`} style={{ marginBottom: 10 }}>
-            <div>Link {link.source} → {link.target}</div>
-            <select
-              value={link.trafficIntensity}
-              onChange={(e) => updateTrafficIntensity(
-                link.source, 
-                link.target, 
-                e.target.value as 'low' | 'medium' | 'high'
-              )}
+        
+        <div style={{
+          padding: isControlsPanelExpanded ? '20px' : '0',
+          opacity: isControlsPanelExpanded ? 1 : 0,
+          transition: 'all 0.3s ease',
+        }}>
+          <div style={{ 
+            marginBottom: 20,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            justifyContent: 'space-between'
+          }}>
+            <span>Theme</span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsDarkMode(!isDarkMode);
+              }}
               style={{
-                background: '#333',
-                color: 'white',
-                border: '1px solid #666',
-                padding: '4px 8px',
-                borderRadius: 4,
-                marginTop: 4,
+                background: 'none',
+                border: isDarkMode 
+                  ? '1px solid rgba(255,255,255,0.3)'
+                  : '1px solid rgba(0,0,0,0.2)',
+                borderRadius: '20px',
+                padding: '4px 12px',
+                color: 'inherit',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.3s ease'
               }}
             >
-              <option value="low">Low Traffic</option>
-              <option value="medium">Medium Traffic</option>
-              <option value="high">High Traffic</option>
-            </select>
+              {isDarkMode ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="5" />
+                  <line x1="12" y1="1" x2="12" y2="3" />
+                  <line x1="12" y1="21" x2="12" y2="23" />
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                  <line x1="1" y1="12" x2="3" y2="12" />
+                  <line x1="21" y1="12" x2="23" y2="12" />
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+              )}
+              {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+            </button>
           </div>
-        ))}
+
+          <div style={{ marginBottom: 15 }}>
+            <label style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              color: isDarkMode ? 'white' : 'black'
+            }}>
+              <input
+                type="checkbox"
+                checked={autoTooltip}
+                onChange={(e) => setAutoTooltip(e.target.checked)}
+              />
+              Auto-moving tooltip
+            </label>
+          </div>
+          <h4 style={{ marginBottom: 8 }}>Traffic Intensity</h4>
+          {networkData.links.map((link) => (
+            <div key={`${link.source}-${link.target}`} style={{ marginBottom: 10 }}>
+              <div>Link {link.source} → {link.target}</div>
+              <select
+                value={link.trafficIntensity}
+                onChange={(e) => updateTrafficIntensity(
+                  link.source, 
+                  link.target, 
+                  e.target.value as 'low' | 'medium' | 'high'
+                )}
+                style={{
+                  background: isDarkMode ? '#333' : '#f0f0f0',
+                  color: isDarkMode ? 'white' : 'black',
+                  border: isDarkMode 
+                    ? '1px solid #666'
+                    : '1px solid #ccc',
+                  padding: '4px 8px',
+                  borderRadius: 4,
+                  marginTop: 4,
+                  width: '100%',
+                }}
+              >
+                <option value="low">Low Traffic</option>
+                <option value="medium">Medium Traffic</option>
+                <option value="high">High Traffic</option>
+              </select>
+            </div>
+          ))}
+        </div>
       </div>
       <Canvas>
+        <color attach="background" args={[isDarkMode ? '#1a1a1a' : '#ffffff']} />
         <PerspectiveCamera makeDefault position={[0, 15, 25]} />
         <OrbitControls 
           enableDamping 
@@ -348,7 +467,7 @@ export const NetworkTopology: React.FC = () => {
         {/* Core sphere */}
         <Sphere args={[SPHERE_RADIUS, 64, 64]}>
           <meshPhongMaterial
-            color="#1a237e"
+            color={isDarkMode ? "#35393f" : "#e3f2fd"}
             transparent
             opacity={0.1}
             wireframe
@@ -356,32 +475,37 @@ export const NetworkTopology: React.FC = () => {
         </Sphere>
         
         {/* Ambient glow for the sphere */}
-        <pointLight position={[0, 0, 0]} intensity={2} color="#4fc3f7" distance={SPHERE_RADIUS * 2} />
+        <pointLight 
+          position={[0, 0, 0]} 
+          intensity={isDarkMode ? 2 : 1} 
+          color={isDarkMode ? "#4fc3f7" : "#2196f3"} 
+          distance={SPHERE_RADIUS * 2} 
+        />
         
         {/* Main lighting setup */}
-        <ambientLight intensity={0.6} />
+        <ambientLight intensity={isDarkMode ? 0.6 : 0.8} />
         <directionalLight
           position={[10, 10, 5]}
-          intensity={8}
+          intensity={isDarkMode ? 8 : 4}
           castShadow
           shadow-mapSize-width={2048}
           shadow-mapSize-height={2048}
-          color="#ffffff"
+          color={isDarkMode ? "#ffffff" : "#fafafa"}
         />
         <directionalLight
           position={[-10, 5, -5]}
-          intensity={1}
-          color="#7ab8ff"
+          intensity={isDarkMode ? 1 : 0.5}
+          color={isDarkMode ? "#7ab8ff" : "#bbdefb"}
         />
         <directionalLight
           position={[0, -5, -10]}
-          intensity={0.4}
-          color="#e4b5ff"
+          intensity={isDarkMode ? 0.4 : 0.2}
+          color={isDarkMode ? "#e4b5ff" : "#f3e5f5"}
         />
         <hemisphereLight
-          intensity={0.4}
-          color="#ffffff"
-          groundColor="#444444"
+          intensity={isDarkMode ? 0.4 : 0.6}
+          color={isDarkMode ? "#ffffff" : "#e3f2fd"}
+          groundColor={isDarkMode ? "#444444" : "#eceff1"}
         />
         <scene>
           {networkData.nodes.map((node) => (
@@ -409,6 +533,7 @@ export const NetworkTopology: React.FC = () => {
                   targetId={link.target}
                   onHover={handleLinkHover}
                   isHighlighted={hoveredLink?.source === link.source && hoveredLink?.target === link.target}
+                  isDarkMode={isDarkMode}
                 />
               );
             }
@@ -420,6 +545,7 @@ export const NetworkTopology: React.FC = () => {
               data={tooltipData.data}
               visible={true}
               targetPosition={tooltipTarget}
+              isDarkMode={isDarkMode}
             />
           )}
         </scene>

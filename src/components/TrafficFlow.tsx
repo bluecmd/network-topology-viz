@@ -7,6 +7,7 @@ interface TrafficFlowProps {
   end: [number, number, number];
   intensity: 'low' | 'medium' | 'high';
   color?: string;
+  isDarkMode?: boolean;
 }
 
 interface IntensityParams {
@@ -67,7 +68,7 @@ export const TrafficFlow: React.FC<TrafficFlowProps> = ({
   start, 
   end, 
   intensity,
-  color = '#00ff88'
+  isDarkMode = true
 }) => {
   const points = useRef<THREE.Points>(null);
   const startVec = useMemo(() => new THREE.Vector3(...start), [start]);
@@ -76,7 +77,7 @@ export const TrafficFlow: React.FC<TrafficFlowProps> = ({
   const progress = useRef<Float32Array>(null);
   const offsets = useRef<THREE.Vector3[]>(null);
   const { count, speed, size } = getIntensityParams(intensity);
-  
+    
   // Calculate sphere radius from start point
   const sphereRadius = useMemo(() => startVec.length(), [startVec]);
 
@@ -158,11 +159,11 @@ export const TrafficFlow: React.FC<TrafficFlowProps> = ({
   return (
     <points ref={points} geometry={particles.geometry}>
       <pointsMaterial
-        color={color}
+        color={'#0068ff'}
         size={size}
         transparent
-        opacity={0.8}
-        blending={THREE.AdditiveBlending}
+        opacity={isDarkMode ? 0.8 : 0.2}
+        blending={isDarkMode ? THREE.AdditiveBlending : THREE.NormalBlending}
         depthWrite={false}
       />
     </points>
