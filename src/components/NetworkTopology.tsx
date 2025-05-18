@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, createRef } from 'react';
 import type { RefObject } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, Sphere } from '@react-three/drei';
 import * as THREE from 'three';
 import { TrafficFlow } from './TrafficFlow';
 import { NetworkTooltip, useTooltipAutoMovement } from './NetworkTooltip';
@@ -24,6 +24,28 @@ interface NetworkData {
   links: Link[];
 }
 
+// Function to distribute points evenly on a sphere's surface
+const distributePointsOnSphere = (count: number, radius: number): [number, number, number][] => {
+  const points: [number, number, number][] = [];
+  const phi = Math.PI * (3 - Math.sqrt(5)); // golden angle in radians
+
+  for (let i = 0; i < count; i++) {
+    const y = 1 - (i / (count - 1)) * 2; // y goes from 1 to -1
+    const radius_at_y = Math.sqrt(1 - y * y); // radius at y
+    
+    const theta = phi * i; // golden angle increment
+
+    const x = Math.cos(theta) * radius_at_y;
+    const z = Math.sin(theta) * radius_at_y;
+
+    points.push([x * radius, y * radius, z * radius]);
+  }
+
+  return points;
+};
+
+const SEGMENTS_PER_CURVE = 32; // Number of segments to create smooth curves
+
 const NetworkLink: React.FC<{ 
   start: THREE.Vector3;
   end: THREE.Vector3;
@@ -39,9 +61,26 @@ const NetworkLink: React.FC<{
   targetId,
   onHover
 }) => {
-  const points = [start, end];
-  const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
-  const midpoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+  // Calculate sphere radius from start point (assuming both points are on same sphere)
+  const radius = start.length();
+  
+  // Create points along the great circle path
+  const curvePoints: THREE.Vector3[] = [];
+  for (let i = 0; i <= SEGMENTS_PER_CURVE; i++) {
+    const t = i / SEGMENTS_PER_CURVE;
+    // Normalize vectors to get points on unit sphere
+    const startNorm = start.clone().normalize();
+    const endNorm = end.clone().normalize();
+    
+    // Use spherical interpolation
+    const point = new THREE.Vector3().lerpVectors(startNorm, endNorm, t);
+    point.normalize().multiplyScalar(radius);
+    curvePoints.push(point);
+  }
+  
+  const lineGeometry = new THREE.BufferGeometry().setFromPoints(curvePoints);
+  const midpoint = new THREE.Vector3().lerpVectors(start, end, 0.5);
+  midpoint.normalize().multiplyScalar(radius);
 
   return (
     <group
@@ -51,7 +90,12 @@ const NetworkLink: React.FC<{
     >
       <primitive object={new THREE.Line(
         lineGeometry,
-        new THREE.LineBasicMaterial({ color: '#ffffff', linewidth: 2, opacity: 0.3, transparent: true })
+        new THREE.LineBasicMaterial({ 
+          color: '#ffffff', 
+          linewidth: 2, 
+          opacity: 0.3, 
+          transparent: true 
+        })
       )} position={midpoint.clone().multiplyScalar(-1)} />
       <TrafficFlow 
         start={[
@@ -71,21 +115,20 @@ const NetworkLink: React.FC<{
 };
 
 export const NetworkTopology: React.FC = () => {
+  const SPHERE_RADIUS = 8;
+  const positions = distributePointsOnSphere(8, SPHERE_RADIUS);
+  
   const [networkData, setNetworkData] = useState<NetworkData>({
     nodes: [
-      // Core mesh nodes (in a square formation)
-      { id: 'core1', position: [-2, 2, -2] },
-      { id: 'core2', position: [2, 2, -2] },
-      { id: 'core3', position: [-2, 2, 2] },
-      { id: 'core4', position: [2, 2, 2] },
-      
-      // Chain 1 extending from core1
-      { id: 'chain1-1', position: [-4, 0, -4] },
-      { id: 'chain1-2', position: [-6, 0, -6] },
-      
-      // Chain 2 extending from core4
-      { id: 'chain2-1', position: [4, 0, 4] },
-      { id: 'chain2-2', position: [6, 0, 6] },
+      // Nodes distributed on sphere surface
+      { id: 'core1', position: positions[0] },
+      { id: 'core2', position: positions[1] },
+      { id: 'core3', position: positions[2] },
+      { id: 'core4', position: positions[3] },
+      { id: 'chain1-1', position: positions[4] },
+      { id: 'chain1-2', position: positions[5] },
+      { id: 'chain2-1', position: positions[6] },
+      { id: 'chain2-2', position: positions[7] },
     ],
     links: [
       // Full mesh between core nodes
@@ -96,11 +139,9 @@ export const NetworkTopology: React.FC = () => {
       { source: 'core2', target: 'core4', trafficIntensity: 'high' },
       { source: 'core3', target: 'core4', trafficIntensity: 'high' },
       
-      // Chain 1 links
+      // Chain links
       { source: 'core1', target: 'chain1-1', trafficIntensity: 'medium' },
       { source: 'chain1-1', target: 'chain1-2', trafficIntensity: 'low' },
-      
-      // Chain 2 links
       { source: 'core4', target: 'chain2-1', trafficIntensity: 'medium' },
       { source: 'chain2-1', target: 'chain2-2', trafficIntensity: 'low' },
     ],
@@ -265,13 +306,29 @@ export const NetworkTopology: React.FC = () => {
         ))}
       </div>
       <Canvas>
-        <PerspectiveCamera makeDefault position={[0, 10, 15]} />
+        <PerspectiveCamera makeDefault position={[0, 15, 25]} />
         <OrbitControls 
           enableDamping 
           dampingFactor={0.05}
-          minDistance={5}
-          maxDistance={30}
+          minDistance={15}
+          maxDistance={40}
+          target={[0, 0, 0]}
         />
+        
+        {/* Core sphere */}
+        <Sphere args={[SPHERE_RADIUS, 64, 64]}>
+          <meshPhongMaterial
+            color="#1a237e"
+            transparent
+            opacity={0.1}
+            wireframe
+          />
+        </Sphere>
+        
+        {/* Ambient glow for the sphere */}
+        <pointLight position={[0, 0, 0]} intensity={2} color="#4fc3f7" distance={SPHERE_RADIUS * 2} />
+        
+        {/* Main lighting setup */}
         <ambientLight intensity={0.6} />
         <directionalLight
           position={[10, 10, 5]}
