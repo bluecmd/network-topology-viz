@@ -46,6 +46,28 @@ const distributePointsOnSphere = (count: number, radius: number): [number, numbe
 
 const SEGMENTS_PER_CURVE = 32; // Number of segments to create smooth curves
 
+// Quaternion-based spherical interpolation for accurate great circle paths
+const getGreatCirclePoint = (
+  start: THREE.Vector3,
+  end: THREE.Vector3,
+  t: number,
+  radius: number
+): THREE.Vector3 => {
+  // Create quaternions from the start and end points
+  const startQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), start.clone().normalize());
+  const endQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), end.clone().normalize());
+  
+  // Perform spherical interpolation between quaternions
+  const slerpQuat = new THREE.Quaternion();
+  slerpQuat.slerpQuaternions(startQuat, endQuat, t);
+  
+  // Create the interpolated point using the quaternion
+  const point = new THREE.Vector3(0, 1, 0).applyQuaternion(slerpQuat);
+  point.multiplyScalar(radius);
+  
+  return point;
+};
+
 const NetworkLink: React.FC<{ 
   start: THREE.Vector3;
   end: THREE.Vector3;
@@ -68,23 +90,14 @@ const NetworkLink: React.FC<{
   const curvePoints: THREE.Vector3[] = [];
   for (let i = 0; i <= SEGMENTS_PER_CURVE; i++) {
     const t = i / SEGMENTS_PER_CURVE;
-    // Normalize vectors to get points on unit sphere
-    const startNorm = start.clone().normalize();
-    const endNorm = end.clone().normalize();
-    
-    // Use spherical interpolation
-    const point = new THREE.Vector3().lerpVectors(startNorm, endNorm, t);
-    point.normalize().multiplyScalar(radius);
+    const point = getGreatCirclePoint(start, end, t, radius);
     curvePoints.push(point);
   }
   
   const lineGeometry = new THREE.BufferGeometry().setFromPoints(curvePoints);
-  const midpoint = new THREE.Vector3().lerpVectors(start, end, 0.5);
-  midpoint.normalize().multiplyScalar(radius);
 
   return (
     <group
-      position={midpoint}
       onPointerEnter={() => onHover(sourceId, targetId)}
       onPointerLeave={() => onHover(sourceId, null)}
     >
@@ -96,18 +109,10 @@ const NetworkLink: React.FC<{
           opacity: 0.3, 
           transparent: true 
         })
-      )} position={midpoint.clone().multiplyScalar(-1)} />
+      )} />
       <TrafficFlow 
-        start={[
-          start.x - midpoint.x,
-          start.y - midpoint.y,
-          start.z - midpoint.z
-        ]}
-        end={[
-          end.x - midpoint.x,
-          end.y - midpoint.y,
-          end.z - midpoint.z
-        ]}
+        start={[start.x, start.y, start.z]}
+        end={[end.x, end.y, end.z]}
         intensity={trafficIntensity}
       />
     </group>

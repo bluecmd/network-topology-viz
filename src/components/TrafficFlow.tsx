@@ -26,33 +26,41 @@ const getGreatCirclePoint = (
   start: THREE.Vector3,
   end: THREE.Vector3,
   t: number,
-  radius: number
+  radius: number,
+  offset: THREE.Vector3 | null = null
 ): THREE.Vector3 => {
-  // Normalize the vectors to get points on unit sphere
-  const startNorm = start.clone().normalize();
-  const endNorm = end.clone().normalize();
+  // Create quaternions from the start and end points
+  const startQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), start.clone().normalize());
+  const endQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), end.clone().normalize());
   
-  // Calculate the angle between vectors
-  const angle = startNorm.angleTo(endNorm);
+  // Perform spherical interpolation between quaternions
+  const slerpQuat = new THREE.Quaternion();
+  slerpQuat.slerpQuaternions(startQuat, endQuat, t);
   
-  // Use spherical interpolation (slerp)
-  const point = new THREE.Vector3().lerpVectors(startNorm, endNorm, t);
-  point.normalize().multiplyScalar(radius);
+  // Create the interpolated point using the quaternion
+  const point = new THREE.Vector3(0, 1, 0).applyQuaternion(slerpQuat);
+  point.multiplyScalar(radius);
+
+  // Apply offset if provided
+  if (offset) {
+    // Create a perpendicular vector for consistent offset direction
+    const tangent = end.clone().sub(start).normalize();
+    const perpendicular = new THREE.Vector3().crossVectors(point, tangent).normalize();
+    point.add(perpendicular.multiplyScalar(offset.length() * 0.1)); // Reduced offset scale
+    // Project back onto sphere surface
+    point.normalize().multiplyScalar(radius);
+  }
   
   return point;
 };
 
 // Function to create a random offset vector for particle spread
-const createRandomOffset = (start: THREE.Vector3, end: THREE.Vector3, maxOffset: number): THREE.Vector3 => {
-  const direction = end.clone().sub(start).normalize();
-  const perpVector = new THREE.Vector3(
-    Math.random() - 0.5,
-    Math.random() - 0.5,
-    Math.random() - 0.5
-  ).normalize();
-  perpVector.crossVectors(perpVector, direction);
-  
-  return perpVector.multiplyScalar(maxOffset * (Math.random() - 0.5));
+const createRandomOffset = (maxOffset: number): THREE.Vector3 => {
+  return new THREE.Vector3(
+    (Math.random() - 0.5) * maxOffset,
+    (Math.random() - 0.5) * maxOffset,
+    (Math.random() - 0.5) * maxOffset
+  );
 };
 
 export const TrafficFlow: React.FC<TrafficFlowProps> = ({ 
@@ -69,7 +77,7 @@ export const TrafficFlow: React.FC<TrafficFlowProps> = ({
   const offsets = useRef<THREE.Vector3[]>(null);
   const { count, speed, size } = getIntensityParams(intensity);
   
-  // Calculate sphere radius from start point (assuming both points are on same sphere)
+  // Calculate sphere radius from start point
   const sphereRadius = useMemo(() => startVec.length(), [startVec]);
 
   const particles = useMemo(() => {
@@ -86,26 +94,22 @@ export const TrafficFlow: React.FC<TrafficFlowProps> = ({
     // Initialize offsets if not already done
     if (!offsets.current || offsets.current.length !== count) {
       offsets.current = Array(count).fill(null).map(() => 
-        createRandomOffset(startVec, endVec, 0.5)
+        createRandomOffset(0.5)
       );
     }
     
     for (let i = 0; i < count; i++) {
-      const basePoint = getGreatCirclePoint(
+      const point = getGreatCirclePoint(
         startVec,
         endVec,
         progress.current[i],
-        sphereRadius
+        sphereRadius,
+        offsets.current[i]
       );
       
-      // Apply offset
-      const offsetPoint = basePoint.clone().add(offsets.current[i]);
-      // Project back onto sphere surface
-      offsetPoint.normalize().multiplyScalar(sphereRadius);
-      
-      positions[i * 3] = offsetPoint.x;
-      positions[i * 3 + 1] = offsetPoint.y;
-      positions[i * 3 + 2] = offsetPoint.z;
+      positions[i * 3] = point.x;
+      positions[i * 3 + 1] = point.y;
+      positions[i * 3 + 2] = point.z;
     }
 
     const geometry = new THREE.BufferGeometry();
@@ -131,24 +135,21 @@ export const TrafficFlow: React.FC<TrafficFlowProps> = ({
       if (progress.current[i] > 1) {
         progress.current[i] = 0;
         // Generate new random offset when particle restarts
-        offsets.current[i] = createRandomOffset(startVec, endVec, 0.5);
+        offsets.current[i] = createRandomOffset(0.5);
       }
 
-      const basePoint = getGreatCirclePoint(
+      const point = getGreatCirclePoint(
         startVec,
         endVec,
         progress.current[i],
-        sphereRadius
+        sphereRadius,
+        offsets.current[i]
       );
-      
-      // Apply offset and project back onto sphere
-      const offsetPoint = basePoint.clone().add(offsets.current[i]);
-      offsetPoint.normalize().multiplyScalar(sphereRadius);
 
       const idx = i * 3;
-      positions[idx] = offsetPoint.x;
-      positions[idx + 1] = offsetPoint.y;
-      positions[idx + 2] = offsetPoint.z;
+      positions[idx] = point.x;
+      positions[idx + 1] = point.y;
+      positions[idx + 2] = point.z;
     }
 
     points.current.geometry.attributes.position.needsUpdate = true;
