@@ -1,12 +1,13 @@
-import { useRef, useState, useEffect, createRef } from 'react';
+import { useRef, useState, useEffect, createRef, useCallback } from 'react';
 import type { RefObject } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Sphere } from '@react-three/drei';
 import * as THREE from 'three';
 import { TrafficFlow } from './TrafficFlow';
 import { NetworkTooltip, useTooltipAutoMovement } from './NetworkTooltip';
 import { NetworkNode } from './NetworkNode';
 import type { NetworkNodeHandle } from './NetworkNode';
+import TWEEN from '@tweenjs/tween.js';
 
 interface Node {
   id: string;
@@ -22,6 +23,20 @@ interface Link {
 interface NetworkData {
   nodes: Node[];
   links: Link[];
+}
+
+interface TooltipData {
+  position: [number, number, number];
+  targetPosition: [number, number, number];
+  data: {
+    type: 'node';
+    title: string;
+    details: string[];
+  } | {
+    type: 'link';
+    title: string;
+    details: string[];
+  };
 }
 
 // Function to distribute points evenly on a sphere's surface
@@ -75,6 +90,7 @@ const NetworkLink: React.FC<{
   sourceId: string;
   targetId: string;
   onHover: (sourceId: string, targetId: string | null) => void;
+  onClick: (sourceId: string, targetId: string) => void;
   isHighlighted?: boolean;
   isDarkMode?: boolean;
 }> = ({
@@ -84,6 +100,7 @@ const NetworkLink: React.FC<{
   sourceId,
   targetId,
   onHover,
+  onClick,
   isHighlighted = false,
   isDarkMode = true
 }) => {
@@ -124,6 +141,157 @@ const NetworkLink: React.FC<{
   );
 };
 
+// Function to find closest point on the great circle path
+const findClosestPointOnGreatCircle = (
+  start: THREE.Vector3,
+  end: THREE.Vector3,
+  point: THREE.Vector3,
+  radius: number
+): THREE.Vector3 => {
+  // Create a set of points along the great circle path
+  const numPoints = 32;
+  let closestPoint = new THREE.Vector3();
+  let minDistance = Infinity;
+
+  for (let i = 0; i <= numPoints; i++) {
+    const t = i / numPoints;
+    const pathPoint = getGreatCirclePoint(start, end, t, radius);
+    const distance = point.distanceTo(pathPoint);
+    
+    if (distance < minDistance) {
+      minDistance = distance;
+      closestPoint.copy(pathPoint);
+    }
+  }
+
+  return closestPoint;
+};
+
+// Function to ensure position is outside sphere
+const ensureOutsideSphere = (
+  position: [number, number, number],
+  radius: number,
+  offset: number = 1.5
+): [number, number, number] => {
+  const vec = new THREE.Vector3(...position);
+  const normalizedVec = vec.normalize();
+  const finalVec = normalizedVec.multiplyScalar(radius * offset);
+  return [finalVec.x, finalVec.y, finalVec.z];
+};
+
+// Camera animation component
+const CameraController: React.FC<{
+  targetPosition?: [number, number, number];
+  tooltipPosition?: [number, number, number];
+}> = ({ targetPosition, tooltipPosition }) => {
+  const { camera, controls: orbitControls } = useThree();
+  const controls = orbitControls as unknown as { target: THREE.Vector3 };
+  
+  useEffect(() => {
+    if (!targetPosition || !tooltipPosition || !controls) return;
+
+    // Keep the center at [0,0,0] - this is our sphere's center
+    const center = new THREE.Vector3(0, 0, 0);
+    
+    // Calculate vectors from center to our points of interest
+    const targetVec = new THREE.Vector3(...targetPosition);
+    const tooltipVec = new THREE.Vector3(...tooltipPosition);
+    
+    // Calculate the direction we want to view from
+    const midpoint = new THREE.Vector3().addVectors(targetVec, tooltipVec).multiplyScalar(0.5);
+    const viewDirection = midpoint.clone().normalize();
+    
+    // Calculate the camera position - move back along the view direction
+    const distance = 25; // Distance from center
+    const cameraPosition = viewDirection.multiplyScalar(-distance); // Negative to move back
+    
+    // Add some height for a better view angle
+    cameraPosition.y += 10;
+    
+    // Create tweens for smooth animation
+    const currentPosition = camera.position.clone();
+    const posTween = new TWEEN.Tween(currentPosition)
+      .to({ x: cameraPosition.x, y: cameraPosition.y, z: cameraPosition.z }, 1500)
+      .easing(TWEEN.Easing.Cubic.InOut)
+      .onUpdate(() => {
+        camera.position.copy(currentPosition);
+      });
+
+    // Always keep the controls target at the center
+    controls.target.set(0, 0, 0);
+
+    // Start the animation
+    posTween.start();
+
+    // Cleanup
+    return () => {
+      posTween.stop();
+    };
+  }, [targetPosition, tooltipPosition, camera, controls]);
+
+  // Animate tweens
+  useEffect(() => {
+    let frameId: number;
+    const animate = () => {
+      frameId = requestAnimationFrame(animate);
+      TWEEN.update();
+    };
+    animate();
+    return () => {
+      cancelAnimationFrame(frameId);
+    };
+  }, []);
+
+  return null;
+};
+
+// Add this component before NetworkTopology
+const AutoRotate: React.FC = () => {
+  const { camera, controls: orbitControls } = useThree();
+  const controls = orbitControls as unknown as { target: THREE.Vector3; autoRotate: boolean; autoRotateSpeed: number };
+  const lastInteraction = useRef<number>(Date.now());
+  const isAutoRotating = useRef<boolean>(true);
+
+  useEffect(() => {
+    const handleInteraction = () => {
+      lastInteraction.current = Date.now();
+      if (controls.autoRotate) {
+        controls.autoRotate = false;
+        isAutoRotating.current = false;
+      }
+    };
+
+    // Add event listeners for user interaction
+    window.addEventListener('mousedown', handleInteraction);
+    window.addEventListener('wheel', handleInteraction);
+    window.addEventListener('touchstart', handleInteraction);
+
+    return () => {
+      window.removeEventListener('mousedown', handleInteraction);
+      window.removeEventListener('wheel', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+    };
+  }, [controls]);
+
+  useFrame(() => {
+    // Check if 5 seconds have passed since last interaction
+    if (!isAutoRotating.current && Date.now() - lastInteraction.current > 5000) {
+      controls.autoRotate = true;
+      isAutoRotating.current = true;
+    }
+  });
+
+  // Set initial auto-rotation
+  useEffect(() => {
+    if (controls) {
+      controls.autoRotate = true;
+      controls.autoRotateSpeed = 1.0;
+    }
+  }, [controls]);
+
+  return null;
+};
+
 export const NetworkTopology: React.FC = () => {
   const SPHERE_RADIUS = 8;
   const positions = distributePointsOnSphere(8, SPHERE_RADIUS);
@@ -157,7 +325,6 @@ export const NetworkTopology: React.FC = () => {
     ],
   });
 
-  // Create refs map at component level
   const nodeRefs = useRef<Map<string, RefObject<NetworkNodeHandle | null>>>(
     new Map(networkData.nodes.map(node => [
       node.id,
@@ -166,15 +333,19 @@ export const NetworkTopology: React.FC = () => {
   );
 
   const [nodePositions, setNodePositions] = useState<Map<string, THREE.Vector3>>(new Map());
-
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [hoveredLink, setHoveredLink] = useState<{ source: string; target: string } | null>(null);
   const [autoTooltip, setAutoTooltip] = useState(true);
+  const lastInteraction = useRef<number>(0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const autoTooltipData = useTooltipAutoMovement(networkData.nodes, networkData.links);
 
   const [isControlsPanelExpanded, setIsControlsPanelExpanded] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
+
+  const [selectedTarget, setSelectedTarget] = useState<[number, number, number] | undefined>();
+  const [selectedTooltip, setSelectedTooltip] = useState<[number, number, number] | undefined>();
 
   // Update node positions
   useEffect(() => {
@@ -216,12 +387,72 @@ export const NetworkTopology: React.FC = () => {
     setHoveredLink(targetId ? { source: sourceId, target: targetId } : null);
   };
 
-  const getHoverTooltipData = () => {
+  const handleNodeClick = useCallback((nodeId: string) => {
+    const node = networkData.nodes.find(n => n.id === nodeId);
+    if (!node) return;
+
+    const radius = Math.sqrt(
+      node.position[0] * node.position[0] +
+      node.position[1] * node.position[1] +
+      node.position[2] * node.position[2]
+    );
+
+    // Ensure we're setting new positions to trigger the camera animation
+    const tooltipPosition = ensureOutsideSphere(node.position, radius);
+    setSelectedTarget(node.position);
+    setSelectedTooltip(tooltipPosition);
+    setHoveredNode(nodeId);
+    setHoveredLink(null);
+    setAutoTooltip(false);
+  }, [networkData.nodes]);
+
+  const handleLinkClick = useCallback((sourceId: string, targetId: string) => {
+    const sourceNode = networkData.nodes.find(n => n.id === sourceId);
+    const targetNode = networkData.nodes.find(n => n.id === targetId);
+    if (!sourceNode || !targetNode) return;
+
+    const sourcePos = new THREE.Vector3(...sourceNode.position);
+    const targetPos = new THREE.Vector3(...targetNode.position);
+    const radius = sourcePos.length();
+
+    const midpoint: [number, number, number] = [
+      (sourceNode.position[0] + targetNode.position[0]) / 2,
+      (sourceNode.position[1] + targetNode.position[1]) / 2,
+      (sourceNode.position[2] + targetNode.position[2]) / 2,
+    ];
+
+    const tooltipPos = ensureOutsideSphere(midpoint, radius);
+    const closestPoint = findClosestPointOnGreatCircle(
+      sourcePos,
+      targetPos,
+      new THREE.Vector3(...midpoint),
+      radius
+    );
+
+    setSelectedTarget([closestPoint.x, closestPoint.y, closestPoint.z]);
+    setSelectedTooltip(tooltipPos);
+    setHoveredNode(null);
+    setHoveredLink({ source: sourceId, target: targetId });
+    setAutoTooltip(false);
+  }, [networkData.nodes]);
+
+  const getHoverTooltipData = (): TooltipData | null => {
     if (hoveredNode) {
       const node = networkData.nodes.find(n => n.id === hoveredNode);
       if (!node) return null;
+
+      const radius = Math.sqrt(
+        node.position[0] * node.position[0] +
+        node.position[1] * node.position[1] +
+        node.position[2] * node.position[2]
+      );
+
+      // Position tooltip outside sphere
+      const offsetPosition = ensureOutsideSphere(node.position, radius);
+
       return {
-        position: node.position,
+        position: offsetPosition,
+        targetPosition: node.position,
         data: {
           type: 'node' as const,
           title: `Node ${node.id}`,
@@ -239,18 +470,33 @@ export const NetworkTopology: React.FC = () => {
       const targetNode = networkData.nodes.find(n => n.id === hoveredLink.target);
       if (!sourceNode || !targetNode) return null;
       
+      const sourcePos = new THREE.Vector3(...sourceNode.position);
+      const radius = sourcePos.length();
+      
       const midpoint: [number, number, number] = [
         (sourceNode.position[0] + targetNode.position[0]) / 2,
         (sourceNode.position[1] + targetNode.position[1]) / 2,
         (sourceNode.position[2] + targetNode.position[2]) / 2,
       ];
       
+      // Position tooltip outside sphere
+      const offsetPosition = ensureOutsideSphere(midpoint, radius);
+      
       const link = networkData.links.find(
         l => l.source === hoveredLink.source && l.target === hoveredLink.target
       );
+
+      // Find closest point on the curved line
+      const closestPoint = findClosestPointOnGreatCircle(
+        sourcePos,
+        new THREE.Vector3(...targetNode.position),
+        new THREE.Vector3(...midpoint),
+        radius
+      );
       
       return {
-        position: midpoint,
+        position: offsetPosition,
+        targetPosition: [closestPoint.x, closestPoint.y, closestPoint.z] as [number, number, number],
         data: {
           type: 'link' as const,
           title: `Link ${hoveredLink.source} → ${hoveredLink.target}`,
@@ -276,12 +522,19 @@ export const NetworkTopology: React.FC = () => {
       const sourceNode = networkData.nodes.find(n => n.id === hoveredLink.source);
       const targetNode = networkData.nodes.find(n => n.id === hoveredLink.target);
       if (sourceNode && targetNode) {
-        // Return midpoint of the link
-        return [
+        const sourcePos = new THREE.Vector3(...sourceNode.position);
+        const targetPos = new THREE.Vector3(...targetNode.position);
+        const tooltipPos = new THREE.Vector3(
           (sourceNode.position[0] + targetNode.position[0]) / 2,
           (sourceNode.position[1] + targetNode.position[1]) / 2,
-          (sourceNode.position[2] + targetNode.position[2]) / 2,
-        ];
+          (sourceNode.position[2] + targetNode.position[2]) / 2
+        );
+        
+        // Find the closest point on the curved line
+        const radius = sourcePos.length(); // Assuming all nodes are on same sphere
+        const closestPoint = findClosestPointOnGreatCircle(sourcePos, targetPos, tooltipPos, radius);
+        
+        return [closestPoint.x, closestPoint.y, closestPoint.z] as [number, number, number];
       }
     }
     
@@ -291,14 +544,51 @@ export const NetworkTopology: React.FC = () => {
   const tooltipData = autoTooltip ? autoTooltipData : getHoverTooltipData();
   const tooltipTarget = getTooltipTargetPosition();
 
+  useEffect(() => {
+    const handleMouseMove = () => {
+      lastInteraction.current = Date.now();
+      setAutoTooltip(false);
+    };
+
+    const handleMouseLeave = () => {
+      lastInteraction.current = Date.now();
+    };
+
+    const checkInactivity = () => {
+      if (Date.now() - lastInteraction.current > 5000) {
+        setAutoTooltip(true);
+      }
+    };
+
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('mousemove', handleMouseMove);
+      container.addEventListener('mouseleave', handleMouseLeave);
+    }
+
+    // Check every second if we should enable auto-tooltip
+    const interval = setInterval(checkInactivity, 1000);
+
+    return () => {
+      if (container) {
+        container.removeEventListener('mousemove', handleMouseMove);
+        container.removeEventListener('mouseleave', handleMouseLeave);
+      }
+      clearInterval(interval);
+    };
+  }, []);
+
   return (
-    <div style={{ 
-      width: '100%', 
-      height: '100vh', 
-      position: 'relative',
-      background: isDarkMode ? '#1a1a1a' : '#ffffff',
-      transition: 'background 0.3s ease'
-    }}>
+    <div 
+      ref={containerRef}
+      style={{ 
+        width: '100%', 
+        height: '100vh', 
+        position: 'relative',
+        background: isDarkMode ? '#1a1a1a' : '#ffffff',
+        transition: 'background 0.3s ease'
+      }}
+    >
       <div style={{
         position: 'absolute',
         top: 20,
@@ -454,6 +744,11 @@ export const NetworkTopology: React.FC = () => {
         </div>
       </div>
       <Canvas>
+        <AutoRotate />
+        <CameraController 
+          targetPosition={selectedTarget}
+          tooltipPosition={selectedTooltip}
+        />
         <color attach="background" args={[isDarkMode ? '#1a1a1a' : '#ffffff']} />
         <PerspectiveCamera makeDefault position={[0, 15, 25]} />
         <OrbitControls 
@@ -462,6 +757,12 @@ export const NetworkTopology: React.FC = () => {
           minDistance={15}
           maxDistance={40}
           target={[0, 0, 0]}
+          enablePan={true}
+          enableZoom={true}
+          enableRotate={true}
+          makeDefault
+          autoRotate={false}
+          autoRotateSpeed={1.0}
         />
         
         {/* Core sphere */}
@@ -515,6 +816,7 @@ export const NetworkTopology: React.FC = () => {
               position={node.position}
               id={node.id}
               onHover={handleNodeHover}
+              onClick={handleNodeClick}
               scale={0.8}
               isHighlighted={hoveredNode === node.id}
             />
@@ -532,6 +834,7 @@ export const NetworkTopology: React.FC = () => {
                   sourceId={link.source}
                   targetId={link.target}
                   onHover={handleLinkHover}
+                  onClick={handleLinkClick}
                   isHighlighted={hoveredLink?.source === link.source && hoveredLink?.target === link.target}
                   isDarkMode={isDarkMode}
                 />
@@ -544,7 +847,7 @@ export const NetworkTopology: React.FC = () => {
               position={tooltipData.position}
               data={tooltipData.data}
               visible={true}
-              targetPosition={tooltipTarget}
+              targetPosition={autoTooltip ? tooltipData.targetPosition : tooltipTarget}
               isDarkMode={isDarkMode}
             />
           )}

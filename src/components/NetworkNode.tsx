@@ -7,6 +7,7 @@ interface NetworkNodeProps {
   position: [number, number, number];
   id: string;
   onHover: (id: string | null) => void;
+  onClick: (id: string) => void;
   scale?: number;
   isHighlighted?: boolean;
 }
@@ -19,6 +20,7 @@ export const NetworkNode = forwardRef<NetworkNodeHandle, NetworkNodeProps>(({
   position, 
   id, 
   onHover,
+  onClick,
   scale = 1,
   isHighlighted = false
 }, ref) => {
@@ -105,6 +107,10 @@ export const NetworkNode = forwardRef<NetworkNodeHandle, NetworkNodeProps>(({
       scale={[scale, scale, scale]}
       onPointerEnter={() => onHover(id)}
       onPointerLeave={() => onHover(null)}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        onClick(id);
+      }}
     >
       <primitive 
         object={model} 

@@ -41,15 +41,28 @@ export function NetworkTooltip({
   return (
     <group>
       {lineGeometry && (
-        <primitive object={new THREE.Line(
-          lineGeometry,
-          new THREE.LineBasicMaterial({ 
-            color: isDarkMode ? '#ffffff' : '#000000', 
-            opacity: isDarkMode ? 0.4 : 0.5, 
-            transparent: true,
-            linewidth: 1
-          })
-        )} />
+        <>
+          {/* Main line */}
+          <primitive object={new THREE.Line(
+            lineGeometry,
+            new THREE.LineBasicMaterial({ 
+              color: isDarkMode ? '#ffffff' : '#000000', 
+              opacity: isDarkMode ? 0.8 : 0.6, 
+              transparent: true,
+              linewidth: 3
+            })
+          )} />
+          {/* Glow effect */}
+          <primitive object={new THREE.Line(
+            lineGeometry,
+            new THREE.LineBasicMaterial({ 
+              color: isDarkMode ? '#4fc3f7' : '#2196f3',
+              opacity: 0.4,
+              transparent: true,
+              linewidth: 6
+            })
+          )} />
+        </>
       )}
       <Html
         ref={tooltipRef}
@@ -57,18 +70,18 @@ export function NetworkTooltip({
         style={{
           display: visible ? 'block' : 'none',
           backgroundColor: 'rgba(0, 0, 0, 0.9)',
-          padding: '80px 100px',
-          borderRadius: '32px',
+          padding: '160px 200px',
+          borderRadius: '64px',
           color: 'white',
-          fontSize: '128px',
+          fontSize: '256px',
           pointerEvents: 'none',
           whiteSpace: 'nowrap',
           userSelect: 'none',
-          boxShadow: '0 16px 64px rgba(0,0,0,0.5)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          minWidth: '1600px',
-          border: '4px solid rgba(255,255,255,0.15)',
+          boxShadow: '0 32px 128px rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(32px)',
+          WebkitBackdropFilter: 'blur(32px)',
+          minWidth: '3200px',
+          border: '8px solid rgba(255,255,255,0.15)',
           transform: 'translateY(-50%)'
         }}
         transform={false}
@@ -76,13 +89,13 @@ export function NetworkTooltip({
       >
         <div style={{ 
           fontWeight: 'bold', 
-          marginBottom: '60px',
-          fontSize: '156px',
+          marginBottom: '120px',
+          fontSize: '312px',
           lineHeight: '1.2',
-          borderBottom: '6px solid rgba(255,255,255,0.2)',
-          paddingBottom: '40px',
-          textShadow: '0 4px 8px rgba(0,0,0,0.4)',
-          letterSpacing: '2px'
+          borderBottom: '12px solid rgba(255,255,255,0.2)',
+          paddingBottom: '80px',
+          textShadow: '0 8px 16px rgba(0,0,0,0.4)',
+          letterSpacing: '4px'
         }}>
           {data.title}
         </div>
@@ -90,26 +103,26 @@ export function NetworkTooltip({
           <div 
             key={index} 
             style={{ 
-              fontSize: '128px', 
+              fontSize: '256px', 
               opacity: 0.9,
               lineHeight: '1.4',
-              marginTop: '40px',
+              marginTop: '80px',
               display: 'flex',
               alignItems: 'center',
-              gap: '40px',
-              textShadow: '0 4px 8px rgba(0,0,0,0.3)',
-              letterSpacing: '1px'
+              gap: '80px',
+              textShadow: '0 8px 16px rgba(0,0,0,0.3)',
+              letterSpacing: '2px'
             }}
           >
             <span style={{ 
-              width: '48px', 
-              height: '48px', 
+              width: '96px', 
+              height: '96px', 
               borderRadius: '50%', 
               backgroundColor: '#00ff88',
               display: 'inline-block',
-              marginRight: '50px',
-              boxShadow: '0 0 40px rgba(0,255,136,0.6)',
-              border: '4px solid rgba(0,255,136,0.3)'
+              marginRight: '100px',
+              boxShadow: '0 0 80px rgba(0,255,136,0.6)',
+              border: '8px solid rgba(0,255,136,0.3)'
             }}></span>
             {detail}
           </div>
@@ -122,7 +135,68 @@ export function NetworkTooltip({
 interface AutoTooltipState {
   position: [number, number, number];
   data: TooltipData;
+  targetPosition: [number, number, number];
 }
+
+// Function to find closest point on the great circle path
+const findClosestPointOnGreatCircle = (
+  start: THREE.Vector3,
+  end: THREE.Vector3,
+  point: THREE.Vector3,
+  radius: number
+): THREE.Vector3 => {
+  // Create a set of points along the great circle path
+  const numPoints = 32;
+  let closestPoint = new THREE.Vector3();
+  let minDistance = Infinity;
+
+  for (let i = 0; i <= numPoints; i++) {
+    const t = i / numPoints;
+    const pathPoint = getGreatCirclePoint(start, end, t, radius);
+    const distance = point.distanceTo(pathPoint);
+    
+    if (distance < minDistance) {
+      minDistance = distance;
+      closestPoint.copy(pathPoint);
+    }
+  }
+
+  return closestPoint;
+};
+
+// Function to get point on great circle path
+const getGreatCirclePoint = (
+  start: THREE.Vector3,
+  end: THREE.Vector3,
+  t: number,
+  radius: number
+): THREE.Vector3 => {
+  // Create quaternions from the start and end points
+  const startQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), start.clone().normalize());
+  const endQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), end.clone().normalize());
+  
+  // Perform spherical interpolation between quaternions
+  const slerpQuat = new THREE.Quaternion();
+  slerpQuat.slerpQuaternions(startQuat, endQuat, t);
+  
+  // Create the interpolated point using the quaternion
+  const point = new THREE.Vector3(0, 1, 0).applyQuaternion(slerpQuat);
+  point.multiplyScalar(radius);
+  
+  return point;
+};
+
+// Function to ensure position is outside sphere
+const ensureOutsideSphere = (
+  position: [number, number, number],
+  radius: number,
+  offset: number = 1.5
+): [number, number, number] => {
+  const vec = new THREE.Vector3(...position);
+  const normalizedVec = vec.normalize();
+  const finalVec = normalizedVec.multiplyScalar(radius * offset);
+  return [finalVec.x, finalVec.y, finalVec.z];
+};
 
 export function useTooltipAutoMovement(
   nodes: { id: string; position: [number, number, number] }[],
@@ -141,8 +215,18 @@ export function useTooltipAutoMovement(
 
       if (currentIndex.current < nodes.length) {
         const node = nodes[currentIndex.current];
+        const radius = Math.sqrt(
+          node.position[0] * node.position[0] +
+          node.position[1] * node.position[1] +
+          node.position[2] * node.position[2]
+        );
+        
+        // Position tooltip outside sphere
+        const offsetPosition = ensureOutsideSphere(node.position, radius);
+
         setTooltipData({
-          position: node.position,
+          position: offsetPosition,
+          targetPosition: node.position,
           data: {
             type: 'node',
             title: `Node ${node.id}`,
@@ -160,14 +244,31 @@ export function useTooltipAutoMovement(
         const targetNode = nodes.find(n => n.id === link.target);
         
         if (sourceNode && targetNode) {
+          const sourcePos = new THREE.Vector3(...sourceNode.position);
+          const targetPos = new THREE.Vector3(...targetNode.position);
+          const radius = sourcePos.length(); // Assuming all nodes are on same sphere
+          
+          // Calculate midpoint
           const midpoint: [number, number, number] = [
             (sourceNode.position[0] + targetNode.position[0]) / 2,
             (sourceNode.position[1] + targetNode.position[1]) / 2,
-            (sourceNode.position[2] + targetNode.position[2]) / 2,
+            (sourceNode.position[2] + targetNode.position[2]) / 2
           ];
           
+          // Position tooltip outside sphere
+          const offsetPosition = ensureOutsideSphere(midpoint, radius);
+          
+          // Find closest point on the curved line
+          const closestPoint = findClosestPointOnGreatCircle(
+            sourcePos,
+            targetPos,
+            new THREE.Vector3(...midpoint),
+            radius
+          );
+          
           setTooltipData({
-            position: midpoint,
+            position: offsetPosition,
+            targetPosition: [closestPoint.x, closestPoint.y, closestPoint.z],
             data: {
               type: 'link',
               title: `Link ${link.source} → ${link.target}`,
