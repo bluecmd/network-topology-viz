@@ -23,7 +23,7 @@ export const NetworkNode = forwardRef<NetworkNodeHandle, NetworkNodeProps>(({
   isHighlighted = false
 }, ref) => {
   const groupRef = useRef<THREE.Group>(null);
-  const { scene } = useGLTF('vintage_terminal.glb');
+  const { scene } = useGLTF('data_center_rack.glb');
   
   // Clone the scene to avoid sharing materials between instances
   const model = scene.clone(true);
@@ -108,7 +108,8 @@ export const NetworkNode = forwardRef<NetworkNodeHandle, NetworkNodeProps>(({
     >
       <primitive 
         object={model} 
-        scale={[0.5, 0.5, 0.5]}
+        rotation={[1.5, 0.5, 0]}
+        scale={[0.7, 0.7, 0.7]}
       />
       {/* Add a subtle glow effect */}
       <pointLight
@@ -122,4 +123,4 @@ export const NetworkNode = forwardRef<NetworkNodeHandle, NetworkNodeProps>(({
 });
 
 // Preload the model to avoid loading delays
-useGLTF.preload('vintage_terminal.glb'); 
+useGLTF.preload('data_center_rack.glb'); 
