@@ -87,7 +87,7 @@ const nettopology = {
     ReactDOM.createRoot(container).render(
       <React.StrictMode>
         <NetworkTopology 
-          initialData={config.data || defaultData}
+          data={config.data || defaultData}
           isDarkMode={config.isDarkMode}
           showControlPanel={config.showControlPanel}
         />

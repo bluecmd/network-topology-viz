@@ -12,6 +12,10 @@ import TWEEN from '@tweenjs/tween.js';
 interface Node {
   id: string;
   position: [number, number, number];
+  sphericalPosition?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 interface Link {
@@ -268,30 +272,47 @@ const AutoRotate: React.FC = () => {
   return null;
 };
 
+// Convert spherical coordinates (latitude, longitude) to Cartesian (x, y, z)
+const sphericalToCartesian = (latitude: number, longitude: number, radius: number = 1): [number, number, number] => {
+  // Convert to radians
+  const lat = (latitude * Math.PI) / 180;
+  const lon = (longitude * Math.PI) / 180;
+  
+  // Convert to Cartesian coordinates
+  const x = radius * Math.cos(lat) * Math.sin(lon);
+  const y = radius * Math.sin(lat);
+  const z = radius * Math.cos(lat) * Math.cos(lon);
+  
+  return [x, y, z];
+};
+
 export interface NetworkTopologyProps {
-  initialData: NetworkData;
+  data: NetworkData;
   isDarkMode?: boolean;
   showControlPanel?: boolean;
 }
 
 export const NetworkTopology: React.FC<NetworkTopologyProps> = ({ 
-  initialData,
+  data,
   isDarkMode: initialIsDarkMode = true,
   showControlPanel = true 
 }) => {
   const SPHERE_RADIUS = 8;
   
-  const [networkData, setNetworkData] = useState<NetworkData>({
-    ...initialData,
-    nodes: initialData.nodes.map(node => ({
+  // Process nodes to ensure all have Cartesian coordinates
+  const [networkData, setNetworkData] = useState<NetworkData>(() => ({
+    ...data,
+    nodes: data.nodes.map(node => ({
       ...node,
-      position: [
-        node.position[0] * SPHERE_RADIUS,
-        node.position[1] * SPHERE_RADIUS,
-        node.position[2] * SPHERE_RADIUS
-      ]
+      position: node.sphericalPosition 
+        ? sphericalToCartesian(
+            node.sphericalPosition.latitude,
+            node.sphericalPosition.longitude,
+            SPHERE_RADIUS
+          )
+        : node.position.map(coord => coord * SPHERE_RADIUS) as [number, number, number]
     }))
-  });
+  }));
 
   const nodeRefs = useRef<Map<string, RefObject<NetworkNodeHandle | null>>>(
     new Map(networkData.nodes.map(node => [
