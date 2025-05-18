@@ -39,26 +39,6 @@ interface TooltipData {
   };
 }
 
-// Function to distribute points evenly on a sphere's surface
-const distributePointsOnSphere = (count: number, radius: number): [number, number, number][] => {
-  const points: [number, number, number][] = [];
-  const phi = Math.PI * (3 - Math.sqrt(5)); // golden angle in radians
-
-  for (let i = 0; i < count; i++) {
-    const y = 1 - (i / (count - 1)) * 2; // y goes from 1 to -1
-    const radius_at_y = Math.sqrt(1 - y * y); // radius at y
-    
-    const theta = phi * i; // golden angle increment
-
-    const x = Math.cos(theta) * radius_at_y;
-    const z = Math.sin(theta) * radius_at_y;
-
-    points.push([x * radius, y * radius, z * radius]);
-  }
-
-  return points;
-};
-
 const SEGMENTS_PER_CURVE = 32; // Number of segments to create smooth curves
 
 // Quaternion-based spherical interpolation for accurate great circle paths
@@ -100,7 +80,6 @@ const NetworkLink: React.FC<{
   sourceId,
   targetId,
   onHover,
-  onClick,
   isHighlighted = false,
   isDarkMode = true
 }) => {
@@ -189,9 +168,6 @@ const CameraController: React.FC<{
   
   useEffect(() => {
     if (!targetPosition || !tooltipPosition || !controls) return;
-
-    // Keep the center at [0,0,0] - this is our sphere's center
-    const center = new THREE.Vector3(0, 0, 0);
     
     // Calculate vectors from center to our points of interest
     const targetVec = new THREE.Vector3(...targetPosition);
@@ -247,7 +223,7 @@ const CameraController: React.FC<{
 
 // Add this component before NetworkTopology
 const AutoRotate: React.FC = () => {
-  const { camera, controls: orbitControls } = useThree();
+  const { controls: orbitControls } = useThree();
   const controls = orbitControls as unknown as { target: THREE.Vector3; autoRotate: boolean; autoRotateSpeed: number };
   const lastInteraction = useRef<number>(Date.now());
   const isAutoRotating = useRef<boolean>(true);
@@ -292,37 +268,23 @@ const AutoRotate: React.FC = () => {
   return null;
 };
 
-export const NetworkTopology: React.FC = () => {
+export interface NetworkTopologyProps {
+  initialData: NetworkData;
+}
+
+export const NetworkTopology: React.FC<NetworkTopologyProps> = ({ initialData }) => {
   const SPHERE_RADIUS = 8;
-  const positions = distributePointsOnSphere(8, SPHERE_RADIUS);
   
   const [networkData, setNetworkData] = useState<NetworkData>({
-    nodes: [
-      // Nodes distributed on sphere surface
-      { id: 'core1', position: positions[0] },
-      { id: 'core2', position: positions[1] },
-      { id: 'core3', position: positions[2] },
-      { id: 'core4', position: positions[3] },
-      { id: 'chain1-1', position: positions[4] },
-      { id: 'chain1-2', position: positions[5] },
-      { id: 'chain2-1', position: positions[6] },
-      { id: 'chain2-2', position: positions[7] },
-    ],
-    links: [
-      // Full mesh between core nodes
-      { source: 'core1', target: 'core2', trafficIntensity: 'high' },
-      { source: 'core1', target: 'core3', trafficIntensity: 'high' },
-      { source: 'core1', target: 'core4', trafficIntensity: 'high' },
-      { source: 'core2', target: 'core3', trafficIntensity: 'high' },
-      { source: 'core2', target: 'core4', trafficIntensity: 'high' },
-      { source: 'core3', target: 'core4', trafficIntensity: 'high' },
-      
-      // Chain links
-      { source: 'core1', target: 'chain1-1', trafficIntensity: 'medium' },
-      { source: 'chain1-1', target: 'chain1-2', trafficIntensity: 'low' },
-      { source: 'core4', target: 'chain2-1', trafficIntensity: 'medium' },
-      { source: 'chain2-1', target: 'chain2-2', trafficIntensity: 'low' },
-    ],
+    ...initialData,
+    nodes: initialData.nodes.map(node => ({
+      ...node,
+      position: [
+        node.position[0] * SPHERE_RADIUS,
+        node.position[1] * SPHERE_RADIUS,
+        node.position[2] * SPHERE_RADIUS
+      ]
+    }))
   });
 
   const nodeRefs = useRef<Map<string, RefObject<NetworkNodeHandle | null>>>(
@@ -581,10 +543,8 @@ export const NetworkTopology: React.FC = () => {
   return (
     <div 
       ref={containerRef}
-      style={{ 
-        width: '100%', 
-        height: '100vh', 
-        position: 'relative',
+      className="network-topology-container"
+      style={{
         background: isDarkMode ? '#1a1a1a' : '#ffffff',
         transition: 'background 0.3s ease'
       }}

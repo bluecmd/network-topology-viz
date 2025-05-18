@@ -25,7 +25,7 @@ export const NetworkNode = forwardRef<NetworkNodeHandle, NetworkNodeProps>(({
   isHighlighted = false
 }, ref) => {
   const groupRef = useRef<THREE.Group>(null);
-  const { scene } = useGLTF('data_center_rack.glb');
+  const { scene } = useGLTF('https://bluecmd.github.io/network-topology-viz/data_center_rack.glb');
   
   // Clone the scene to avoid sharing materials between instances
   const model = scene.clone(true);
@@ -129,4 +129,4 @@ export const NetworkNode = forwardRef<NetworkNodeHandle, NetworkNodeProps>(({
 });
 
 // Preload the model to avoid loading delays
-useGLTF.preload('data_center_rack.glb'); 
+useGLTF.preload('https://bluecmd.github.io/network-topology-viz/data_center_rack.glb'); 
