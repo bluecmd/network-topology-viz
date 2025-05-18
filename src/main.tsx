@@ -15,12 +15,18 @@ interface NetworkData {
   }>;
 }
 
+interface NetworkConfig {
+  data?: NetworkData;
+  isDarkMode?: boolean;
+  showControlPanel?: boolean;
+}
+
 // Function to distribute points evenly on a sphere's surface
 const distributePointsOnSphere = (count: number): [number, number, number][] => {
   const points: [number, number, number][] = [];
   const phi = Math.PI * (3 - Math.sqrt(5)); // golden angle in radians
 
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < count; i++) { 
     const y = 1 - (i / (count - 1)) * 2; // y goes from 1 to -1
     const radius_at_y = Math.sqrt(1 - y * y); // radius at y
     
@@ -68,32 +74,58 @@ const defaultData: NetworkData = {
 
 // Global API
 const nettopology = {
-  init: (data: NetworkData = defaultData) => {
+  init: (config: NetworkConfig = {}) => {
     const container = document.getElementById('nettopology');
     if (!container) {
       console.error('Could not find element with id "nettopology"');
       return;
     }
 
+    // Clear any existing content
+    container.innerHTML = '';
+
     ReactDOM.createRoot(container).render(
       <React.StrictMode>
-        <NetworkTopology initialData={data} />
+        <NetworkTopology 
+          initialData={config.data || defaultData}
+          isDarkMode={config.isDarkMode}
+          showControlPanel={config.showControlPanel}
+        />
       </React.StrictMode>
     );
   }
 };
 
-// Auto-initialize if the script is loaded after DOM is ready
-if (document.readyState === 'complete' || document.readyState === 'interactive') {
-  nettopology.init();
-} else {
-  document.addEventListener('DOMContentLoaded', () => nettopology.init());
-}
+// Flag to track if manual initialization has occurred
+let manualInitCalled = false;
 
-// Expose global API
+// Expose global API with initialization tracking
 declare global {
   interface Window {
-    nettopology: typeof nettopology;
+    nettopology: typeof nettopology & { _manualInitCalled?: boolean };
   }
 }
-window.nettopology = nettopology;
+
+const wrappedNettopology = {
+  ...nettopology,
+  init: (config: NetworkConfig = {}) => {
+    manualInitCalled = true;
+    window.nettopology._manualInitCalled = true;
+    nettopology.init(config);
+  }
+};
+
+// Auto-initialize only if no manual init has been called
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  if (!manualInitCalled) {
+    nettopology.init();
+  }
+} else {
+  document.addEventListener('DOMContentLoaded', () => {
+    if (!manualInitCalled && !window.nettopology._manualInitCalled) {
+      nettopology.init();
+    }
+  });
+}
+
+window.nettopology = wrappedNettopology;

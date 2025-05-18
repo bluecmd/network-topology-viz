@@ -14,7 +14,7 @@ export default defineConfig({
       formats: ['iife']
     },
     sourcemap: true,
-    minify: false,
+    minify: true,
     rollupOptions: {
       output: {
         globals: {}

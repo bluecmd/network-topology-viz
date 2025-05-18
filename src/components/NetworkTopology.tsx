@@ -270,9 +270,15 @@ const AutoRotate: React.FC = () => {
 
 export interface NetworkTopologyProps {
   initialData: NetworkData;
+  isDarkMode?: boolean;
+  showControlPanel?: boolean;
 }
 
-export const NetworkTopology: React.FC<NetworkTopologyProps> = ({ initialData }) => {
+export const NetworkTopology: React.FC<NetworkTopologyProps> = ({ 
+  initialData,
+  isDarkMode: initialIsDarkMode = true,
+  showControlPanel = true 
+}) => {
   const SPHERE_RADIUS = 8;
   
   const [networkData, setNetworkData] = useState<NetworkData>({
@@ -304,7 +310,7 @@ export const NetworkTopology: React.FC<NetworkTopologyProps> = ({ initialData })
   const autoTooltipData = useTooltipAutoMovement(networkData.nodes, networkData.links);
 
   const [isControlsPanelExpanded, setIsControlsPanelExpanded] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(initialIsDarkMode);
 
   const [selectedTarget, setSelectedTarget] = useState<[number, number, number] | undefined>();
   const [selectedTooltip, setSelectedTooltip] = useState<[number, number, number] | undefined>();
@@ -549,160 +555,162 @@ export const NetworkTopology: React.FC<NetworkTopologyProps> = ({ initialData })
         transition: 'background 0.3s ease'
       }}
     >
-      <div style={{
-        position: 'absolute',
-        top: 20,
-        left: 20,
-        background: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)',
-        borderRadius: 8,
-        color: isDarkMode ? 'white' : 'black',
-        zIndex: 1000,
-        transition: 'all 0.3s ease',
-        width: isControlsPanelExpanded ? 'auto' : '48px',
-        height: isControlsPanelExpanded ? 'auto' : '48px',
-        overflow: 'hidden',
-        cursor: 'pointer',
-        boxShadow: isDarkMode 
-          ? '0 4px 12px rgba(0,0,0,0.3)' 
-          : '0 4px 12px rgba(0,0,0,0.1)',
-      }}>
-        <div 
-          style={{
-            padding: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            borderBottom: isControlsPanelExpanded 
-              ? isDarkMode 
-                ? '1px solid rgba(255,255,255,0.2)'
-                : '1px solid rgba(0,0,0,0.1)'
-              : 'none',
-          }}
-          onClick={() => setIsControlsPanelExpanded(!isControlsPanelExpanded)}
-        >
-          <svg 
-            width="24" 
-            height="24" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2"
-            style={{
-              transform: isControlsPanelExpanded ? 'rotate(180deg)' : 'none',
-              transition: 'transform 0.3s ease'
-            }}
-          >
-            <path d="M19 9l-7 7-7-7" />
-          </svg>
-          <span style={{ 
-            whiteSpace: 'nowrap',
-            opacity: isControlsPanelExpanded ? 1 : 0,
-            transition: 'opacity 0.3s ease'
-          }}>
-            Network Controls
-          </span>
-        </div>
-        
+      {showControlPanel && (
         <div style={{
-          padding: isControlsPanelExpanded ? '20px' : '0',
-          opacity: isControlsPanelExpanded ? 1 : 0,
+          position: 'absolute',
+          top: 20,
+          left: 20,
+          background: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)',
+          borderRadius: 8,
+          color: isDarkMode ? 'white' : 'black',
+          zIndex: 1000,
           transition: 'all 0.3s ease',
+          width: isControlsPanelExpanded ? 'auto' : '48px',
+          height: isControlsPanelExpanded ? 'auto' : '48px',
+          overflow: 'hidden',
+          cursor: 'pointer',
+          boxShadow: isDarkMode 
+            ? '0 4px 12px rgba(0,0,0,0.3)' 
+            : '0 4px 12px rgba(0,0,0,0.1)',
         }}>
-          <div style={{ 
-            marginBottom: 20,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            justifyContent: 'space-between'
-          }}>
-            <span>Theme</span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsDarkMode(!isDarkMode);
-              }}
+          <div 
+            style={{
+              padding: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              borderBottom: isControlsPanelExpanded 
+                ? isDarkMode 
+                  ? '1px solid rgba(255,255,255,0.2)'
+                  : '1px solid rgba(0,0,0,0.1)'
+                : 'none',
+            }}
+            onClick={() => setIsControlsPanelExpanded(!isControlsPanelExpanded)}
+          >
+            <svg 
+              width="24" 
+              height="24" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2"
               style={{
-                background: 'none',
-                border: isDarkMode 
-                  ? '1px solid rgba(255,255,255,0.3)'
-                  : '1px solid rgba(0,0,0,0.2)',
-                borderRadius: '20px',
-                padding: '4px 12px',
-                color: 'inherit',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.3s ease'
+                transform: isControlsPanelExpanded ? 'rotate(180deg)' : 'none',
+                transition: 'transform 0.3s ease'
               }}
             >
-              {isDarkMode ? (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="5" />
-                  <line x1="12" y1="1" x2="12" y2="3" />
-                  <line x1="12" y1="21" x2="12" y2="23" />
-                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                  <line x1="1" y1="12" x2="3" y2="12" />
-                  <line x1="21" y1="12" x2="23" y2="12" />
-                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-                </svg>
-              ) : (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                </svg>
-              )}
-              {isDarkMode ? 'Light Mode' : 'Dark Mode'}
-            </button>
-          </div>
-
-          <div style={{ marginBottom: 15 }}>
-            <label style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '8px',
-              color: isDarkMode ? 'white' : 'black'
+              <path d="M19 9l-7 7-7-7" />
+            </svg>
+            <span style={{ 
+              whiteSpace: 'nowrap',
+              opacity: isControlsPanelExpanded ? 1 : 0,
+              transition: 'opacity 0.3s ease'
             }}>
-              <input
-                type="checkbox"
-                checked={autoTooltip}
-                onChange={(e) => setAutoTooltip(e.target.checked)}
-              />
-              Auto-moving tooltip
-            </label>
+              Network Controls
+            </span>
           </div>
-          <h4 style={{ marginBottom: 8 }}>Traffic Intensity</h4>
-          {networkData.links.map((link) => (
-            <div key={`${link.source}-${link.target}`} style={{ marginBottom: 10 }}>
-              <div>Link {link.source} → {link.target}</div>
-              <select
-                value={link.trafficIntensity}
-                onChange={(e) => updateTrafficIntensity(
-                  link.source, 
-                  link.target, 
-                  e.target.value as 'low' | 'medium' | 'high'
-                )}
+          
+          <div style={{
+            padding: isControlsPanelExpanded ? '20px' : '0',
+            opacity: isControlsPanelExpanded ? 1 : 0,
+            transition: 'all 0.3s ease',
+          }}>
+            <div style={{ 
+              marginBottom: 20,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              justifyContent: 'space-between'
+            }}>
+              <span>Theme</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsDarkMode(!isDarkMode);
+                }}
                 style={{
-                  background: isDarkMode ? '#333' : '#f0f0f0',
-                  color: isDarkMode ? 'white' : 'black',
+                  background: 'none',
                   border: isDarkMode 
-                    ? '1px solid #666'
-                    : '1px solid #ccc',
-                  padding: '4px 8px',
-                  borderRadius: 4,
-                  marginTop: 4,
-                  width: '100%',
+                    ? '1px solid rgba(255,255,255,0.3)'
+                    : '1px solid rgba(0,0,0,0.2)',
+                  borderRadius: '20px',
+                  padding: '4px 12px',
+                  color: 'inherit',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'all 0.3s ease'
                 }}
               >
-                <option value="low">Low Traffic</option>
-                <option value="medium">Medium Traffic</option>
-                <option value="high">High Traffic</option>
-              </select>
+                {isDarkMode ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="5" />
+                    <line x1="12" y1="1" x2="12" y2="3" />
+                    <line x1="12" y1="21" x2="12" y2="23" />
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                    <line x1="1" y1="12" x2="3" y2="12" />
+                    <line x1="21" y1="12" x2="23" y2="12" />
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                  </svg>
+                )}
+                {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+              </button>
             </div>
-          ))}
+
+            <div style={{ marginBottom: 15 }}>
+              <label style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                color: isDarkMode ? 'white' : 'black'
+              }}>
+                <input
+                  type="checkbox"
+                  checked={autoTooltip}
+                  onChange={(e) => setAutoTooltip(e.target.checked)}
+                />
+                Auto-moving tooltip
+              </label>
+            </div>
+            <h4 style={{ marginBottom: 8 }}>Traffic Intensity</h4>
+            {networkData.links.map((link) => (
+              <div key={`${link.source}-${link.target}`} style={{ marginBottom: 10 }}>
+                <div>Link {link.source} → {link.target}</div>
+                <select
+                  value={link.trafficIntensity}
+                  onChange={(e) => updateTrafficIntensity(
+                    link.source, 
+                    link.target, 
+                    e.target.value as 'low' | 'medium' | 'high'
+                  )}
+                  style={{
+                    background: isDarkMode ? '#333' : '#f0f0f0',
+                    color: isDarkMode ? 'white' : 'black',
+                    border: isDarkMode 
+                      ? '1px solid #666'
+                      : '1px solid #ccc',
+                    padding: '4px 8px',
+                    borderRadius: 4,
+                    marginTop: 4,
+                    width: '100%',
+                  }}
+                >
+                  <option value="low">Low Traffic</option>
+                  <option value="medium">Medium Traffic</option>
+                  <option value="high">High Traffic</option>
+                </select>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
       <Canvas>
         <AutoRotate />
         <CameraController 
