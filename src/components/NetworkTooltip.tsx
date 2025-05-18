@@ -1,5 +1,6 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import { Html } from '@react-three/drei';
+import * as THREE from 'three';
 
 interface TooltipData {
   type: 'node' | 'link';
@@ -11,76 +12,103 @@ interface NetworkTooltipProps {
   position: [number, number, number];
   data: TooltipData;
   visible?: boolean;
+  targetPosition?: [number, number, number]; // Position to draw line to
 }
 
-export function NetworkTooltip({ position, data, visible = true }: NetworkTooltipProps) {
+export function NetworkTooltip({ position, data, visible = true, targetPosition }: NetworkTooltipProps) {
   const tooltipRef = useRef<HTMLDivElement>(null);
 
+  // Create line geometry if targetPosition is provided
+  const lineGeometry = useMemo(() => {
+    if (!targetPosition) return null;
+    
+    const geometry = new THREE.BufferGeometry();
+    const vertices = new Float32Array([
+      position[0], position[1], position[2],
+      targetPosition[0], targetPosition[1], targetPosition[2]
+    ]);
+    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    return geometry;
+  }, [position, targetPosition]);
+
   return (
-    <Html
-      ref={tooltipRef}
-      position={position}
-      style={{
-        display: visible ? 'block' : 'none',
-        backgroundColor: 'rgba(0, 0, 0, 0.9)',
-        padding: '80px 100px',
-        borderRadius: '32px',
-        color: 'white',
-        fontSize: '128px',
-        pointerEvents: 'none',
-        whiteSpace: 'nowrap',
-        userSelect: 'none',
-        boxShadow: '0 16px 64px rgba(0,0,0,0.5)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        minWidth: '1600px',
-        border: '4px solid rgba(255,255,255,0.15)',
-        transform: 'translateY(-50%)'
-      }}
-      transform={false}
-      distanceFactor={1}
-    >
-      <div style={{ 
-        fontWeight: 'bold', 
-        marginBottom: '60px',
-        fontSize: '156px',
-        lineHeight: '1.2',
-        borderBottom: '6px solid rgba(255,255,255,0.2)',
-        paddingBottom: '40px',
-        textShadow: '0 4px 8px rgba(0,0,0,0.4)',
-        letterSpacing: '2px'
-      }}>
-        {data.title}
-      </div>
-      {data.details.map((detail, index) => (
-        <div 
-          key={index} 
-          style={{ 
-            fontSize: '128px', 
-            opacity: 0.9,
-            lineHeight: '1.4',
-            marginTop: '40px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '40px',
-            textShadow: '0 4px 8px rgba(0,0,0,0.3)',
-            letterSpacing: '1px'
-          }}
-        >
-          <span style={{ 
-            width: '48px', 
-            height: '48px', 
-            borderRadius: '50%', 
-            backgroundColor: '#00ff88',
-            display: 'inline-block',
-            marginRight: '50px',
-            boxShadow: '0 0 40px rgba(0,255,136,0.6)',
-            border: '4px solid rgba(0,255,136,0.3)'
-          }}></span>
-          {detail}
+    <group>
+      {lineGeometry && (
+        <primitive object={new THREE.Line(
+          lineGeometry,
+          new THREE.LineBasicMaterial({ 
+            color: '#ffffff', 
+            opacity: 0.4, 
+            transparent: true,
+            linewidth: 1
+          })
+        )} />
+      )}
+      <Html
+        ref={tooltipRef}
+        position={position}
+        style={{
+          display: visible ? 'block' : 'none',
+          backgroundColor: 'rgba(0, 0, 0, 0.9)',
+          padding: '80px 100px',
+          borderRadius: '32px',
+          color: 'white',
+          fontSize: '128px',
+          pointerEvents: 'none',
+          whiteSpace: 'nowrap',
+          userSelect: 'none',
+          boxShadow: '0 16px 64px rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          minWidth: '1600px',
+          border: '4px solid rgba(255,255,255,0.15)',
+          transform: 'translateY(-50%)'
+        }}
+        transform={false}
+        distanceFactor={1}
+      >
+        <div style={{ 
+          fontWeight: 'bold', 
+          marginBottom: '60px',
+          fontSize: '156px',
+          lineHeight: '1.2',
+          borderBottom: '6px solid rgba(255,255,255,0.2)',
+          paddingBottom: '40px',
+          textShadow: '0 4px 8px rgba(0,0,0,0.4)',
+          letterSpacing: '2px'
+        }}>
+          {data.title}
         </div>
-      ))}
-    </Html>
+        {data.details.map((detail, index) => (
+          <div 
+            key={index} 
+            style={{ 
+              fontSize: '128px', 
+              opacity: 0.9,
+              lineHeight: '1.4',
+              marginTop: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '40px',
+              textShadow: '0 4px 8px rgba(0,0,0,0.3)',
+              letterSpacing: '1px'
+            }}
+          >
+            <span style={{ 
+              width: '48px', 
+              height: '48px', 
+              borderRadius: '50%', 
+              backgroundColor: '#00ff88',
+              display: 'inline-block',
+              marginRight: '50px',
+              boxShadow: '0 0 40px rgba(0,255,136,0.6)',
+              border: '4px solid rgba(0,255,136,0.3)'
+            }}></span>
+            {detail}
+          </div>
+        ))}
+      </Html>
+    </group>
   );
 }
 

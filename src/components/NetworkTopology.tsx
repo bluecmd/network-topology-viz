@@ -75,13 +75,15 @@ const NetworkLink: React.FC<{
   sourceId: string;
   targetId: string;
   onHover: (sourceId: string, targetId: string | null) => void;
+  isHighlighted?: boolean;
 }> = ({
   start,
   end,
   trafficIntensity,
   sourceId,
   targetId,
-  onHover
+  onHover,
+  isHighlighted = false
 }) => {
   // Calculate sphere radius from start point (assuming both points are on same sphere)
   const radius = start.length();
@@ -106,7 +108,7 @@ const NetworkLink: React.FC<{
         new THREE.LineBasicMaterial({ 
           color: '#ffffff', 
           linewidth: 2, 
-          opacity: 0.3, 
+          opacity: isHighlighted ? 0.8 : 0.3, 
           transparent: true 
         })
       )} />
@@ -258,7 +260,30 @@ export const NetworkTopology: React.FC = () => {
     return null;
   };
 
+  const getTooltipTargetPosition = (): [number, number, number] | undefined => {
+    if (hoveredNode) {
+      const node = networkData.nodes.find(n => n.id === hoveredNode);
+      if (node) return node.position;
+    }
+    
+    if (hoveredLink) {
+      const sourceNode = networkData.nodes.find(n => n.id === hoveredLink.source);
+      const targetNode = networkData.nodes.find(n => n.id === hoveredLink.target);
+      if (sourceNode && targetNode) {
+        // Return midpoint of the link
+        return [
+          (sourceNode.position[0] + targetNode.position[0]) / 2,
+          (sourceNode.position[1] + targetNode.position[1]) / 2,
+          (sourceNode.position[2] + targetNode.position[2]) / 2,
+        ];
+      }
+    }
+    
+    return undefined;
+  };
+
   const tooltipData = autoTooltip ? autoTooltipData : getHoverTooltipData();
+  const tooltipTarget = getTooltipTargetPosition();
 
   return (
     <div style={{ width: '100%', height: '100vh', position: 'relative' }}>
@@ -367,6 +392,7 @@ export const NetworkTopology: React.FC = () => {
               id={node.id}
               onHover={handleNodeHover}
               scale={0.8}
+              isHighlighted={hoveredNode === node.id}
             />
           ))}
           {networkData.links.map((link) => {
@@ -382,6 +408,7 @@ export const NetworkTopology: React.FC = () => {
                   sourceId={link.source}
                   targetId={link.target}
                   onHover={handleLinkHover}
+                  isHighlighted={hoveredLink?.source === link.source && hoveredLink?.target === link.target}
                 />
               );
             }
@@ -392,6 +419,7 @@ export const NetworkTopology: React.FC = () => {
               position={tooltipData.position}
               data={tooltipData.data}
               visible={true}
+              targetPosition={tooltipTarget}
             />
           )}
         </scene>

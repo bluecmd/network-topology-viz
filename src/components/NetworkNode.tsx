@@ -8,6 +8,7 @@ interface NetworkNodeProps {
   id: string;
   onHover: (id: string | null) => void;
   scale?: number;
+  isHighlighted?: boolean;
 }
 
 export interface NetworkNodeHandle {
@@ -18,13 +19,31 @@ export const NetworkNode = forwardRef<NetworkNodeHandle, NetworkNodeProps>(({
   position, 
   id, 
   onHover,
-  scale = 1 
+  scale = 1,
+  isHighlighted = false
 }, ref) => {
   const groupRef = useRef<THREE.Group>(null);
-  const { scene } = useGLTF('data_center_rack.glb');
+  const { scene } = useGLTF('vintage_terminal.glb');
   
   // Clone the scene to avoid sharing materials between instances
   const model = scene.clone(true);
+
+  // Apply highlight effect to all materials in the model
+  if (isHighlighted) {
+    model.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.material) {
+        if (Array.isArray(child.material)) {
+          child.material.forEach(mat => {
+            mat.emissive = new THREE.Color('#ffffff');
+            mat.emissiveIntensity = 0.5;
+          });
+        } else {
+          child.material.emissive = new THREE.Color('#ffffff');
+          child.material.emissiveIntensity = 0.5;
+        }
+      }
+    });
+  }
 
   useImperativeHandle(ref, () => ({
     getCenter: () => {
@@ -89,14 +108,12 @@ export const NetworkNode = forwardRef<NetworkNodeHandle, NetworkNodeProps>(({
     >
       <primitive 
         object={model} 
-        // Add a slight tilt to make it more visually interesting
-        rotation={[1.5, 0.5, 0]}
-        scale={[0.5,0.5,0.5]}
+        scale={[0.5, 0.5, 0.5]}
       />
       {/* Add a subtle glow effect */}
       <pointLight
         color="#00ff88"
-        intensity={1}
+        intensity={isHighlighted ? 2 : 1}
         distance={2}
         decay={2}
       />
@@ -105,4 +122,4 @@ export const NetworkNode = forwardRef<NetworkNodeHandle, NetworkNodeProps>(({
 });
 
 // Preload the model to avoid loading delays
-useGLTF.preload('data_center_rack.glb'); 
+useGLTF.preload('vintage_terminal.glb'); 
