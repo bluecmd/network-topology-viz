@@ -725,8 +725,8 @@ export const NetworkTopology: React.FC<NetworkTopologyProps> = ({
           minDistance={15}
           maxDistance={40}
           target={[0, 0, 0]}
-          enablePan={true}
-          enableZoom={true}
+          enablePan={false}
+          enableZoom={false}
           enableRotate={true}
           makeDefault
           autoRotate={false}
